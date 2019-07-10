@@ -1,7 +1,7 @@
 #!/bin/bash 
 set -e
 
-echo -e "Test!!!"
+wget -O /usr/local/bin/ https://raw.githubusercontent.com/lobocode/saitama/master/saitama 
 
 
 
