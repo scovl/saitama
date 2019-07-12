@@ -1,5 +1,5 @@
 /* 
-Saitama a way to kill your processes with a single punch. 
+Saitama a way to kill your processes with one punch. 
 developed by lobocode - lobocode@fedoraproject.org 
 */
 
@@ -20,9 +20,9 @@ import (
 // args holds the commandline args
 var args []string
 
+// findAndKillProcess in /proc/<pid>/status name and number
 func findAndKillProcess(path string, info os.FileInfo, err error) error {
 
-    // We are only interested in files with a path looking like /proc/<pid>/status.
     if strings.Count(path, "/") == 3 {
         if strings.Contains(path, "/status") {
 
