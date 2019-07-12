@@ -23,6 +23,11 @@ var args []string
 // findAndKillProcess in /proc/<pid>/status name and number
 func findAndKillProcess(path string, info os.FileInfo, err error) error {
 
+    if err != nil {
+        fmt.Printf("Process owner is root!\n Please use sudo.\n")
+        return nil
+    }
+
     if strings.Count(path, "/") == 3 {
         if strings.Contains(path, "/status") {
 
@@ -56,8 +61,13 @@ func findAndKillProcess(path string, info os.FileInfo, err error) error {
 
                 proc, _ := os.FindProcess(pid)
 
+
                 // Kill the process
                 proc.Kill()
+
+                // if err == not permission
+                // then fmt.Printf message
+                
 
             }
 
