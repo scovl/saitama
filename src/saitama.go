@@ -23,10 +23,13 @@ var args []string
 // findAndKillProcess in /proc/<pid>/status name and number
 func findAndKillProcess(path string, info os.FileInfo, err error) error {
 
-    if err != nil {
-        fmt.Printf("Process owner is root!\n Please use sudo.\n")
-        return nil
-    }
+
+    //if err != nil {
+    //    //fmt.Printf("Process owner is root!\n Please use sudo.\n")
+    //    fmt.Printf("%s\n",err)
+    //    return nil
+   // }
+
 
     if strings.Count(path, "/") == 3 {
         if strings.Contains(path, "/status") {
@@ -57,17 +60,20 @@ func findAndKillProcess(path string, info os.FileInfo, err error) error {
             `
 
             if name == args[1] {
-                fmt.Printf("PID: %d %s %s .\n", pid, name, asciArt)
+                
 
                 proc, _ := os.FindProcess(pid)
 
 
-                // Kill the process
-                proc.Kill()
-
-                // if err == not permission
-                // then fmt.Printf message
-                
+                if proc.Kill() != nil {
+                    // If process owner is root
+                    fmt.Printf("Please use sudo\n")
+                } else {
+                    // Kill the process
+                    fmt.Printf("Killing %s with one punch \n", args[1])
+                    fmt.Printf("PID: %d %s %s .\n", pid, name, asciArt)
+                    proc.Kill()
+                }        
 
             }
 
@@ -84,8 +90,6 @@ func main() {
     if len(args) != 2 {
         log.Fatalln("Usage: saitama <processname>")
     }
-
-    fmt.Printf("Killing %s with one punch \n", args[1])
 
     err := filepath.Walk("/proc", findAndKillProcess)
     
