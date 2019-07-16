@@ -8,6 +8,8 @@ curl -s https://raw.githubusercontent.com/lobocode/saitama/master/saitama-instal
 
 ### How to use?
 
+![](https://raw.githubusercontent.com/lobocode/saitama/master/img/saitama-terminal.gif)
+
 ```
 saitama --punch <processname> to kill the processname
 saitama --list to list processname
