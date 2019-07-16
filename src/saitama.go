@@ -62,8 +62,8 @@ func findAndKillProcess(path string, info os.FileInfo, err error) error {
 					} else {
 						fmt.Printf("Killing %s with one punch \n", args[2])
 						fmt.Printf("PID: %d %s %s .\n", pid, processName, oh)
-						//proc.Kill()
-						fmt.Printf("%s\n", proc)
+						proc.Kill()
+						
 
 						// if error
 						return io.EOF
