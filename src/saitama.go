@@ -62,7 +62,8 @@ func findAndKillProcess(path string, info os.FileInfo, err error) error {
 					} else {
 						fmt.Printf("Killing %s with one punch \n", args[2])
 						fmt.Printf("PID: %d %s %s .\n", pid, processName, oh)
-						proc.Kill()
+						//proc.Kill()
+						fmt.Printf("%s\n", proc)
 
 						// if error
 						return io.EOF
@@ -70,7 +71,7 @@ func findAndKillProcess(path string, info os.FileInfo, err error) error {
 				}
 
 			default:
-				log.Fatalln("Error")
+				log.Fatalln("\nMissing operand\nTry 'saitama --help' for more information")
 			}
 
 		}
