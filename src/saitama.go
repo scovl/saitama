@@ -53,7 +53,6 @@ func findAndKillProcess(path string, info os.FileInfo, err error) error {
 			case "-p", "--punch":
 				if len(args) == 2 {
 					log.Fatalln("\nMissing operand\nTry 'saitama --help' for more information")
-					return io.EOF
 				} else if processName == args[2] {
 
 					proc, _ := os.FindProcess(pid)
