@@ -1,4 +1,4 @@
-# Saitama kills all processes by name at once, with one punch
+## Saitama kills all processes by name at once, with one punch
 
 <p align="center">
   <img width="240" height="200" src="https://raw.githubusercontent.com/lobocode/saitama/master/img/saitama.png">
