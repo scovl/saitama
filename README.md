@@ -1,6 +1,9 @@
 # Saitama kills all processes by name at once, with one punch
 
-![saitama.png](https://raw.githubusercontent.com/lobocode/saitama/master/img/saitama.png)
+<p align="center">
+  <img width="200" height="200" src="https://raw.githubusercontent.com/lobocode/saitama/master/img/saitama.png">
+</p>
+
 
 ## How to install
 
@@ -21,5 +24,5 @@ saitama --help to more information
 Example:
 
 ```bash
-saitama firefox
+saitama --punch firefox
 ```
