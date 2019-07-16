@@ -1,4 +1,4 @@
-Saitama kills all processes by name at once, with a single punch.
+Saitama kills all processes by name at once, with one punch.
 
 ### How to install?
 
@@ -9,11 +9,13 @@ curl -s https://raw.githubusercontent.com/lobocode/saitama/master/saitama-instal
 ### How to use?
 
 ```
-saitama process-name
+saitama --punch <processname> to kill the processname
+saitama --list to list processname
+saitama --help to more information
 ```
 
 Example:
 
 ```
-saitama firefox
+saitama --punch firefox
 ```
