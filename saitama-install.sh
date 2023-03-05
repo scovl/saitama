@@ -1,8 +1,8 @@
-#!/bin/bash 
+#!/bin/bash
 set -e
 
-wget -O /usr/local/bin/saitama https://github.com/lobocode/saitama/raw/master/bin/saitama
-chmod 755 /usr/local/bin/saitama
+SAITAMA_URL="https://github.com/lobocode/saitama/raw/master/bin/saitama"
+SAITAMA_PATH="/usr/local/bin/saitama"
 
-
-
+wget -O "$SAITAMA_PATH" "$SAITAMA_URL"
+chmod 755 "$SAITAMA_PATH"
