@@ -2,9 +2,8 @@
 package main
 
 import (
-	"bytes"
+	"bufio"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -13,82 +12,75 @@ import (
 	"strings"
 )
 
-// args holds the commandline args
-var args []string
-
+// findAndKillProcess searches the /proc directory to find the process with the specified name
+// on the command line and sends an interrupt signal to kill it.
 func findAndKillProcess(path string, info os.FileInfo, err error) error {
+	if err != nil {
+		return err
+	}
 
-	// We are only interested in files with a path looking like /proc/<pid>/status.
-	if strings.Count(path, "/") == 3 {
-		if strings.Contains(path, "/status") {
+	// It only processes directories with names similar to "/proc/<pid>/status".
+	if strings.Count(path, "/") == 3 && strings.Contains(path, "/status") {
+		pidStr := path[strings.Index(path, "proc")+5 : strings.Index(path, "/status")]
+		pid, err := strconv.Atoi(pidStr)
+		if err != nil {
+			log.Printf("Could not convert pid %s for integer: %v", pidStr, err)
+			return nil
+		}
 
-			pid, _ := strconv.Atoi(path[6:strings.LastIndex(path, "/")])
+		// Extracts the process name from the first line of the "status" file.
+		status, err := ioutil.ReadFile(path)
+		if err != nil {
+			log.Printf("Could not read the file %s: %v", path, err)
+			return nil
+		}
+		processName := ""
+		scanner := bufio.NewScanner(strings.NewReader(string(status)))
+		for scanner.Scan() {
+			line := scanner.Text()
+			if strings.HasPrefix(line, "Name:") {
+				processName = strings.TrimSpace(strings.TrimPrefix(line, "Name:"))
+				break
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			log.Printf("Error reading file %s: %v", path, err)
+			return nil
+		}
 
-			readIndex, _ := ioutil.ReadFile(path)
+		// Performs the action as per the command line.
+		switch args[1] {
+		case "--help", "-h":
+			fmt.Println(`Usage: saitama [OPTION] <processname>
+Kill process with one punch
 
-			// Extract the process name from within the first line in the buffer
-			processName := string(readIndex[6:bytes.IndexByte(readIndex, '\n')])
+Mandatory arguments:
 
-			oh :=
-				`⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-		⠀⠀⠀⠀⣠⣶⡾⠏⠉⠙⠳⢦⡀⠀⠀⠀⢠⠞⠉⠙⠲⡀⠀
-		⠀⠀⠀⣴⠿⠏⠀⠀⠀⠀⠀⠀⢳⡀⠀ ⡏⠀⠀⠀⠀ ⢷
-		⠀⠀⢠⣟⣋⡀⢀⣀⣀⡀⠀⣀⡀⣧⠀⢸⠀⠀⠀⠀⠀ ⡇
-		⠀⠀⢸⣯⡭⠁⠸⣛⣟⠆⡴⣻⡲⣿⠀⣸⠀⠀Oh!⠀⡇
-		⠀⠀⣟⣿⡭⠀⠀⠀⠀⠀⢱⠀⠀⣿⠀⢹⠀⠀⠀⠀⠀ ⡇
-		⠀⠀⠙⢿⣯⠄⠀⠀⠀⢀⡀⠀⠀⡿⠀⠀⡇⠀⠀⠀⠀⡼
-		⠀⠀⠀⠀⠹⣶⠆⠀⠀⠀⠀⠀⡴⠃⠀⠀⠘⠤⣄⣠⠞⠀
-		⠀⠀⠀⠀⠀⢸⣷⡦⢤⡤⢤⣞⣁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-		⠀⠀⢀⣤⣴⣿⣏⠁⠀⠀⠸⣏⢯⣷⣖⣦⡀⠀⠀⠀⠀⠀⠀
-		⢀⣾⣽⣿⣿⣿⣿⠛⢲⣶⣾⢉⡷⣿⣿⠵⣿⠀⠀⠀⠀⠀⠀
-		⣼⣿⠍⠉⣿⡭⠉⠙⢺⣇⣼⡏⠀⠀⠀⣄⢸⠀⠀⠀⠀⠀⠀
-		⣿⣿⣧⣀⣿.........⣀⣰⣏⣘⣆ 
-		`
+-h, --help		display this help and exit
+-l, --list		list process by name
+-p, --punch <processname>	punch process by name`)
+			return io.EOF
 
-			switch args[1] {
-			case "--help", "-h":
-				log.Fatalln("\nUsage: saitama [OPTION] <processname>\nKill process with one punch\n\nMandatory arguments\n\n-h  --help	display this help and exit\n-l  --list	list process by name\n-p  --punch <processname> punch process by name")
-			case "-l", "--list":
-				fmt.Printf("%s\n", processName)
-			case "-p", "--punch":
-				if len(args) == 2 {
-					log.Fatalln("\nMissing operand\nTry 'saitama --help' for more information")
-				} else if processName == args[2] {
+		case "-l", "--list":
+			fmt.Printf("%s\n", processName)
 
-					proc, _ := os.FindProcess(pid)
-
-					if proc.Kill() != nil {
-						fmt.Printf("\nWarning: This process owner is 'root'\nPlease use 'sudo'\n")
-					} else {
-						fmt.Printf("Killing %s with one punch \n", args[2])
-						fmt.Printf("PID: %d %s %s .\n", pid, processName, oh)
-						proc.Kill()
-						
-
-						// if error
-						return io.EOF
-					}
-				}
-
-			default:
+		case "-p", "--punch":
+			if len(args) < 3 {
 				log.Fatalln("\nMissing operand\nTry 'saitama --help' for more information")
 			}
+			if processName == args[2] {
+				proc, err := os.FindProcess(pid)
+				if err != nil {
+					log.Printf("Could not find process %d: %v", pid, err)
+					return nil
+				}
+				if err := proc.Kill(); err != nil {
+					fmt.Printf("\nWarning: This process owner is 'root'\nPlease use 'sudo'\n")
+				} else {
+					fmt.Printf("Killing %s with one punch \n", args[2])
+					fmt.Printf("PID: %d %s\n", pid, oh)
+				}
+			}
 
-		}
-	}
-
-	return nil
-}
-
-// main is the entry point of any go application
-func main() {
-	args = os.Args
-
-	if len(args) == 1 {
-		log.Fatalln("\nSaitama: missing operand\nTry 'saitama --help' for more information")
-	}
-
-	debugCall := filepath.Walk("/proc", findAndKillProcess)
-	fmt.Printf("%s", debugCall)
-
-}
+		default:
+			log.Fatalln("\nMissing operand\nTry 'saitama --help' for more information")
