@@ -1,10 +1,9 @@
-// killprocess project main.go
 package main
 
 import (
-	"bufio"
+	"bytes"
+	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -12,75 +11,82 @@ import (
 	"strings"
 )
 
-// findAndKillProcess searches the /proc directory to find the process with the specified name
-// on the command line and sends an interrupt signal to kill it.
-func findAndKillProcess(path string, info os.FileInfo, err error) error {
+const asciiArt = `
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⣠⣶⡾⠏⠉⠙⠳⢦⡀⠀⠀⠀⢠⠞⠉⠙⠲⡀⠀
+⠀⠀⠀⣴⠿⠏⠀⠀⠀⠀⠀⠀⢳⡀⠀⡏⠀⠀⠀⠀⢷
+⠀⠀⢠⣟⣋⡀⢀⣀⣀⡀⠀⣀⡀⣧⠀⢸⠀⠀⠀⠀⠀⡇
+⠀⠀⢸⣯⡭⠁⠸⣛⣟⠆⡴⣻⡲⣿⠀⣸⠀⠀Oh!⠀⡇
+⠀⠀⣟⣿⡭⠀⠀⠀⠀⠀⢱⠀⠀⣿⠀⢹⠀⠀⠀⠀⠀⡇
+⠀⠀⠙⢿⣯⠄⠀⠀⠀⢀⡀⠀⠀⡿⠀⠀⡇⠀⠀⠀⠀⡼
+⠀⠀⠀⠀⠹⣶⠆⠀⠀⠀⠀⠀⡴⠃⠀⠀⠘⠤⣄⣠⠞⠀
+⠀⠀⠀⠀⠀⢸⣷⡦⢤⡤⢤⣞⣁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⢀⣤⣴⣿⣏⠁⠀⠀⠸⣏⢯⣷⣖⣦⡀⠀⠀⠀⠀⠀⠀
+⢀⣾⣽⣿⣿⣿⣿⠛⢲⣶⣾⢉⡷⣿⣿⠵⣿⠀⠀⠀⠀⠀⠀
+⣼⣿⠍⠉⣿⡭⠉⠙⢺⣇⣼⡏⠀⠀⠀⣄⢸⠀⠀⠀⠀⠀⠀
+⣿⣿⣧⣀⣿.........⣀⣰⣏⣘⣆
+`
+
+func main() {
+	helpFlag := flag.Bool("help", false, "Display this help and exit")
+	listFlag := flag.Bool("list", false, "List process by name")
+	punchFlag := flag.String("punch", "", "Punch process by name")
+
+	flag.Parse()
+
+	if *helpFlag {
+		fmt.Println("Usage: saitama [OPTION] <processname>\n\nOptions:\n-h, --help\tDisplay this help and exit\n-l, --list\tList process by name\n-p, --punch\tPunch process by name")
+		return
+	}
+
+	if *listFlag && *punchFlag != "" {
+		log.Fatal("Conflicting options: use either --list or --punch")
+	}
+
+	err := filepath.Walk("/proc", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if strings.Count(path, "/") == 3 && strings.Contains(path, "/status") {
+			return handleProcess(path)
+		}
+		return nil
+	})
+
+	if err != nil {
+		log.Fatalf("Error walking through /proc: %v", err)
+	}
+}
+
+func handleProcess(path string) error {
+	pid, err := strconv.Atoi(path[6:strings.LastIndex(path, "/")])
+	if err != nil {
+		return fmt.Errorf("error converting PID to int: %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("error reading file: %v", err)
+	}
+
+	processName := string(data[6:bytes.IndexByte(data, '\n')])
+
+	switch {
+	case flag.Lookup("list").Value.(flag.Getter).Get().(bool):
+		fmt.Println(processName)
+	case flag.Lookup("punch").Value.(flag.Getter).Get().(string) == processName:
+		if err := killProcess(pid); err != nil {
+			return fmt.Errorf("error killing process: %v", err)
+		}
+		fmt.Printf("Killing %s with one punch\nPID: %d %s %s .\n", processName, pid, processName, asciiArt)
+	}
+	return nil
+}
+
+func killProcess(pid int) error {
+	proc, err := os.FindProcess(pid)
 	if err != nil {
 		return err
 	}
-
-	// It only processes directories with names similar to "/proc/<pid>/status".
-	if strings.Count(path, "/") == 3 && strings.Contains(path, "/status") {
-		pidStr := path[strings.Index(path, "proc")+5 : strings.Index(path, "/status")]
-		pid, err := strconv.Atoi(pidStr)
-		if err != nil {
-			log.Printf("Could not convert pid %s for integer: %v", pidStr, err)
-			return nil
-		}
-
-		// Extracts the process name from the first line of the "status" file.
-		status, err := ioutil.ReadFile(path)
-		if err != nil {
-			log.Printf("Could not read the file %s: %v", path, err)
-			return nil
-		}
-		processName := ""
-		scanner := bufio.NewScanner(strings.NewReader(string(status)))
-		for scanner.Scan() {
-			line := scanner.Text()
-			if strings.HasPrefix(line, "Name:") {
-				processName = strings.TrimSpace(strings.TrimPrefix(line, "Name:"))
-				break
-			}
-		}
-		if err := scanner.Err(); err != nil {
-			log.Printf("Error reading file %s: %v", path, err)
-			return nil
-		}
-
-		// Performs the action as per the command line.
-		switch args[1] {
-		case "--help", "-h":
-			fmt.Println(`Usage: saitama [OPTION] <processname>
-Kill process with one punch
-
-Mandatory arguments:
-
--h, --help		display this help and exit
--l, --list		list process by name
--p, --punch <processname>	punch process by name`)
-			return io.EOF
-
-		case "-l", "--list":
-			fmt.Printf("%s\n", processName)
-
-		case "-p", "--punch":
-			if len(args) < 3 {
-				log.Fatalln("\nMissing operand\nTry 'saitama --help' for more information")
-			}
-			if processName == args[2] {
-				proc, err := os.FindProcess(pid)
-				if err != nil {
-					log.Printf("Could not find process %d: %v", pid, err)
-					return nil
-				}
-				if err := proc.Kill(); err != nil {
-					fmt.Printf("\nWarning: This process owner is 'root'\nPlease use 'sudo'\n")
-				} else {
-					fmt.Printf("Killing %s with one punch \n", args[2])
-					fmt.Printf("PID: %d %s\n", pid, oh)
-				}
-			}
-
-		default:
-			log.Fatalln("\nMissing operand\nTry 'saitama --help' for more information")
+	return proc.Kill()
+}
