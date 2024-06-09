@@ -14,14 +14,27 @@ curl -s https://raw.githubusercontent.com/lobocode/saitama/master/saitama-instal
 
 ![saitama-terminal.gif](https://raw.githubusercontent.com/lobocode/saitama/master/img/saitama-terminal.gif)
 
+### Commands
+
+- `saitama list` - Lists all processes by name.
+- `saitama punch <processname>` - Kills the specified process by name.
+- `saitama help` - Displays detailed help information.
+
+### Examples
+
+List all processes by name:
 ```bash
-saitama --punch <processname> to kill the processname
-saitama --list to list processname
-saitama --help to more information
+saitama list
 ```
 
-Example:
-
+Kill a specific process by name:
 ```bash
-saitama --punch firefox
+saitama punch firefox
 ```
+
+Display help information:
+```bash
+saitama help
+```
+
+With the integration of Cobra, the commands are now more structured and easier to use. Use `saitama help` to get more detailed information about each command.
