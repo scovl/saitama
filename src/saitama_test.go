@@ -123,8 +123,9 @@ func TestPunchCommand(t *testing.T) {
 				t.Errorf("Expected '%s' in output, got %v", tc.expected, output)
 			}
 
-			// Verify process was actually killed
-			if err := cmd.Process.Signal(0); err == nil {
+			// Verify process was actually killed by waiting for it
+			err := cmd.Wait()
+			if err == nil {
 				t.Error("Process should have been killed")
 			}
 		})
