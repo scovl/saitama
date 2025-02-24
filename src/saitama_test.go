@@ -93,7 +93,6 @@ func TestPunchCommand(t *testing.T) {
 			// Wait a bit to ensure process is running
 			time.Sleep(100 * time.Millisecond)
 
-			// Redirect stdout
 			old := os.Stdout
 			r, w, _ := os.Pipe()
 			os.Stdout = w
