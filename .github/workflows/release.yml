@@ -1,0 +1,52 @@
+name: Build, Test and Release
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Build
+        run: go build -v ./src/
+
+      - name: Test
+        run: |
+          sudo go test -v ./src/
+        
+      - name: Build for multiple platforms
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          mkdir -p dist
+          GOOS=linux GOARCH=amd64 go build -o dist/saitama-linux-amd64 ./src/
+          GOOS=linux GOARCH=arm64 go build -o dist/saitama-linux-arm64 ./src/
+          GOOS=darwin GOARCH=amd64 go build -o dist/saitama-darwin-amd64 ./src/
+          GOOS=darwin GOARCH=arm64 go build -o dist/saitama-darwin-arm64 ./src/
+          chmod +x dist/*
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            dist/saitama-linux-amd64
+            dist/saitama-linux-arm64
+            dist/saitama-darwin-amd64
+            dist/saitama-darwin-arm64
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
