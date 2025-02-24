@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
-	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
