@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/spf13/cobra"
 )
@@ -63,12 +66,14 @@ var punchCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		processName := args[0]
+		force, _ := cmd.Flags().GetBool("force")
+		
 		err := filepath.Walk("/proc", func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
 			if strings.Count(path, "/") == 3 && strings.Contains(path, "/status") {
-				return handleProcess(path, false, processName)
+				return handleProcess(path, false, processName, force)
 			}
 			return nil
 		})
@@ -79,6 +84,8 @@ var punchCmd = &cobra.Command{
 }
 
 func main() {
+	punchCmd.Flags().BoolP("force", "f", false, "Use SIGKILL instead of SIGTERM")
+	
 	rootCmd.AddCommand(listCmd)
 	rootCmd.AddCommand(punchCmd)
 	if err := rootCmd.Execute(); err != nil {
@@ -98,12 +105,27 @@ func handleProcess(path string, list bool, args ...string) error {
 		return fmt.Errorf("error reading file: %v", err)
 	}
 
-	processName := string(data[6:bytes.IndexByte(data, '\n')])
+	if len(data) < 7 {
+		return fmt.Errorf("invalid process status file: %s", path)
+	}
+
+	nameIndex := bytes.Index(data, []byte("Name:\t"))
+	if nameIndex == -1 {
+		return fmt.Errorf("could not find process name in: %s", path)
+	}
+	
+	endIndex := bytes.Index(data[nameIndex:], []byte("\n"))
+	if endIndex == -1 {
+		return fmt.Errorf("invalid status file format: %s", path)
+	}
+	
+	processName := string(data[nameIndex+6 : nameIndex+endIndex])
+	processName = strings.TrimSpace(processName)
 
 	if list {
 		fmt.Println(processName)
 	} else if len(args) > 0 && args[0] == processName {
-		if err := killProcess(pid); err != nil {
+		if err := killProcess(pid, args[1] == "true"); err != nil {
 			return fmt.Errorf("error killing process: %v", err)
 		}
 		fmt.Printf("Killing %s with one punch\nPID: %d %s %s .\n", processName, pid, processName, asciiArt)
@@ -111,10 +133,14 @@ func handleProcess(path string, list bool, args ...string) error {
 	return nil
 }
 
-func killProcess(pid int) error {
+func killProcess(pid int, force bool) error {
 	proc, err := os.FindProcess(pid)
 	if err != nil {
 		return err
 	}
-	return proc.Kill()
+	
+	if force {
+		return proc.Kill() // SIGKILL
+	}
+	return proc.Signal(syscall.SIGTERM) // Mais gentil
 }
