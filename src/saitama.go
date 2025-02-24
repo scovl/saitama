@@ -94,7 +94,7 @@ func main() {
 	}
 }
 
-func handleProcess(path string, list bool, args ...string) error {
+func handleProcess(path string, list bool, args ...interface{}) error {
 	pid, err := strconv.Atoi(path[6:strings.LastIndex(path, "/")])
 	if err != nil {
 		return fmt.Errorf("error converting PID to int: %v", err)
@@ -124,11 +124,26 @@ func handleProcess(path string, list bool, args ...string) error {
 
 	if list {
 		fmt.Println(processName)
-	} else if len(args) > 0 && args[0] == processName {
-		if err := killProcess(pid, args[1] == "true"); err != nil {
-			return fmt.Errorf("error killing process: %v", err)
+	} else if len(args) > 0 {
+		targetName, ok := args[0].(string)
+		if !ok {
+			return fmt.Errorf("invalid process name argument type")
 		}
-		fmt.Printf("Killing %s with one punch\nPID: %d %s %s .\n", processName, pid, processName, asciiArt)
+		
+		if targetName == processName {
+			force := false
+			if len(args) > 1 {
+				force, ok = args[1].(bool)
+				if !ok {
+					return fmt.Errorf("invalid force argument type")
+				}
+			}
+			
+			if err := killProcess(pid, force); err != nil {
+				return fmt.Errorf("error killing process: %v", err)
+			}
+			fmt.Printf("Killing %s with one punch\nPID: %d %s %s .\n", processName, pid, processName, asciiArt)
+		}
 	}
 	return nil
 }
