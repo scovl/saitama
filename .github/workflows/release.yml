@@ -20,7 +20,7 @@ jobs:
           go-version: '1.21'
 
       - name: Build
-        run: go build -v ./src/
+        run: go build -v -o saitama ./src/saitama.go
 
       - name: Test
         run: |
@@ -30,10 +30,10 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           mkdir -p dist
-          GOOS=linux GOARCH=amd64 go build -o dist/saitama-linux-amd64 ./src/
-          GOOS=linux GOARCH=arm64 go build -o dist/saitama-linux-arm64 ./src/
-          GOOS=darwin GOARCH=amd64 go build -o dist/saitama-darwin-amd64 ./src/
-          GOOS=darwin GOARCH=arm64 go build -o dist/saitama-darwin-arm64 ./src/
+          GOOS=linux GOARCH=amd64 go build -o dist/saitama-linux-amd64 ./src/saitama.go
+          GOOS=linux GOARCH=arm64 go build -o dist/saitama-linux-arm64 ./src/saitama.go
+          GOOS=darwin GOARCH=amd64 go build -o dist/saitama-darwin-amd64 ./src/saitama.go
+          GOOS=darwin GOARCH=arm64 go build -o dist/saitama-darwin-arm64 ./src/saitama.go
           chmod +x dist/*
 
       - name: Create Release
