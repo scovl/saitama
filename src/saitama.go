@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -29,77 +28,81 @@ const asciiArt = `
 ⣿⣿⣧⣀⣿.........⣀⣰⣏⣘⣆
 `
 
-var rootCmd = &cobra.Command{
-	Use:   "saitama",
-	Short: "Saitama is a tool to manage processes",
-	Long: `Saitama is a command line tool to list and punch processes by name.
-It uses the /proc filesystem to gather process information and allows you to punch processes with one command.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
-	},
+type ProcessManager struct {
+	rootCmd  *cobra.Command
+	listCmd  *cobra.Command
+	punchCmd *cobra.Command
 }
 
-var listCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List processes by name",
-	Run: func(cmd *cobra.Command, args []string) {
-		err := filepath.Walk("/proc", func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-			if strings.Count(path, "/") == 3 && strings.Contains(path, "/status") {
-				return handleProcess(path, true)
-			}
-			return nil
-		})
-		if err != nil {
-			log.Fatalf("Error walking through /proc: %v", err)
-		}
-	},
-}
-
-var punchCmd = &cobra.Command{
-	Use:   "punch [processname]",
-	Short: "Punch process by name",
-	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		processName := args[0]
-		force, _ := cmd.Flags().GetBool("force")
-		
-		err := filepath.Walk("/proc", func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-			if strings.Count(path, "/") == 3 && strings.Contains(path, "/status") {
-				return handleProcess(path, false, processName, force)
-			}
-			return nil
-		})
-		if err != nil {
-			log.Fatalf("Error walking through /proc: %v", err)
-		}
-	},
-}
-
-func main() {
-	punchCmd.Flags().BoolP("force", "f", false, "Use SIGKILL instead of SIGTERM")
+func NewProcessManager() *ProcessManager {
+	pm := &ProcessManager{}
 	
-	rootCmd.AddCommand(listCmd)
-	rootCmd.AddCommand(punchCmd)
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+	pm.rootCmd = &cobra.Command{
+		Use:   "saitama",
+		Short: "Saitama is a tool to manage processes",
+		Long:  `Saitama is a command line tool to list and punch processes by name.`,
 	}
+
+	pm.listCmd = &cobra.Command{
+		Use:   "list",
+		Short: "List processes by name",
+		RunE:  pm.runList,
+	}
+
+	pm.punchCmd = &cobra.Command{
+		Use:   "punch [processname]",
+		Short: "Punch process by name",
+		Args:  cobra.ExactArgs(1),
+		RunE:  pm.runPunch,
+	}
+
+	pm.punchCmd.Flags().BoolP("force", "f", false, "Use SIGKILL instead of SIGTERM")
+	pm.rootCmd.AddCommand(pm.listCmd, pm.punchCmd)
+	
+	return pm
 }
 
-func handleProcess(path string, list bool, args ...interface{}) error {
-	pid, err := strconv.Atoi(path[6:strings.LastIndex(path, "/")])
+func (pm *ProcessManager) runList(cmd *cobra.Command, args []string) error {
+	return pm.walkProc(true, "")
+}
+
+func (pm *ProcessManager) runPunch(cmd *cobra.Command, args []string) error {
+	force, _ := cmd.Flags().GetBool("force")
+	return pm.walkProc(false, args[0], force)
+}
+
+func (pm *ProcessManager) walkProc(list bool, processName string, args ...interface{}) error {
+	return filepath.Walk("/proc", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			if os.IsNotExist(err) || strings.Contains(err.Error(), "no such") {
+				return nil
+			}
+			return err
+		}
+		
+		if strings.Count(path, "/") == 3 && strings.Contains(path, "/status") {
+			return pm.handleProcess(path, list, processName, args...)
+		}
+		return nil
+	})
+}
+
+func (pm *ProcessManager) handleProcess(path string, list bool, processName string, args ...interface{}) error {
+	lastSlash := strings.LastIndex(path, "/")
+	if lastSlash < 6 {
+		return fmt.Errorf("invalid path format: %s", path)
+	}
+
+	pid, err := strconv.Atoi(path[6:lastSlash])
 	if err != nil {
 		return fmt.Errorf("error converting PID to int: %v", err)
 	}
 
 	data, err := os.ReadFile(path)
 	if err != nil {
+		if os.IsNotExist(err) || strings.Contains(err.Error(), "no such process") {
+			return nil // Ignora processos que não existem mais
+		}
 		return fmt.Errorf("error reading file: %v", err)
 	}
 
@@ -117,30 +120,24 @@ func handleProcess(path string, list bool, args ...interface{}) error {
 		return fmt.Errorf("invalid status file format: %s", path)
 	}
 	
-	processName := string(data[nameIndex+6 : nameIndex+endIndex])
-	processName = strings.TrimSpace(processName)
+	pName := string(data[nameIndex+6 : nameIndex+endIndex])
+	pName = strings.TrimSpace(pName)
 
 	if list {
-		fmt.Println(processName)
+		fmt.Println(pName)
 	} else if len(args) > 0 {
-		targetName, ok := args[0].(string)
-		if !ok {
-			return fmt.Errorf("invalid process name argument type")
-		}
-		
-		if targetName == processName {
-			force := false
-			if len(args) > 1 {
-				force, ok = args[1].(bool)
+		if processName == pName {
+			if len(args) > 0 {
+				force, ok := args[0].(bool)
 				if !ok {
 					return fmt.Errorf("invalid force argument type")
 				}
+				
+				if err := killProcess(pid, force); err != nil {
+					return fmt.Errorf("error killing process: %v", err)
+				}
+				fmt.Printf("Killing %s with one punch\nPID: %d %s %s .\n", pName, pid, pName, asciiArt)
 			}
-			
-			if err := killProcess(pid, force); err != nil {
-				return fmt.Errorf("error killing process: %v", err)
-			}
-			fmt.Printf("Killing %s with one punch\nPID: %d %s %s .\n", processName, pid, processName, asciiArt)
 		}
 	}
 	return nil
@@ -156,4 +153,23 @@ func killProcess(pid int, force bool) error {
 		return proc.Kill() // SIGKILL
 	}
 	return proc.Signal(syscall.SIGTERM) // Mais gentil
+}
+
+func (pm *ProcessManager) Execute() error {
+	return pm.rootCmd.Execute()
+}
+
+// Para testes
+func (pm *ProcessManager) ExecuteWithArgs(args []string) error {
+	pm.rootCmd.SetArgs(args)
+	return pm.rootCmd.Execute()
+}
+
+var manager = NewProcessManager()
+
+func main() {
+	if err := manager.Execute(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 }
